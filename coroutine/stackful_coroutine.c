@@ -93,38 +93,33 @@ __attribute__((naked)) void switch_state_aarch64(void *store_state, void *load_s
     );
 }
 
-static struct coroutine_t *x;
-static struct coroutine_t *y;
-static struct coroutine_t *z;
+struct coroutine_t create_coro(void (*func)(int)) {
+    struct coroutine_t coro;
 
-struct coroutine_t * create_coro(void (*func)(int)) {
-    struct coroutine_t *coro;
-
-    if (posix_memalign((void**)&coro, 16, sizeof(struct coroutine_t)) != 0) {
-        perror("posix_memalign failed");
-        return NULL;
-    }
-
-    (*coro).func = func;
-    (*coro).co_state.ret = (unsigned long long)func; // For some reason compiler treats func addr as 32 bit initially. We extend to 64.
-    (*coro).co_state.sp = (unsigned long long)&(*coro).stack[4095] + 1; // Set sp to end of coro stack.
-    (*coro).co_state.fp = (unsigned long long)&(*coro).stack[4095] + 1; // Set frame pointer to end of coro stack.
+    coro.func = func;
+    coro.co_state.ret = (unsigned long long)func; // For some reason compiler treats func addr as 32 bit initially. We extend to 64.
+    coro.co_state.sp = (unsigned long long)&coro.stack[4095] + 1; // Set sp to end of coro stack.
+    coro.co_state.fp = (unsigned long long)&coro.stack[4095] + 1; // Set frame pointer to end of coro stack.
     return coro;
 }
+
+static struct coroutine_t x;
+static struct coroutine_t y;
+static struct coroutine_t z;
 
 void work_y() {
     while (1) {
         printf("Hello from y 1!\n");
-        switch_state_aarch64((void *)y, (void *)x);
+        switch_state_aarch64((void *)&y, (void *)&x);
         printf("Hello from y 2!\n");
-        switch_state_aarch64((void *)y, (void *)x);
+        switch_state_aarch64((void *)&y, (void *)&x);
     }
 }
 
 void work_z() {
     while (1) {
         printf("Hello from z!\n");
-        switch_state_aarch64((void *)z, (void *)x);
+        switch_state_aarch64((void *)&z, (void *)&x);
     }
 }
 
@@ -139,9 +134,9 @@ int main() {
 
     while (1) {
         printf("Hello from x 1!\n");
-        switch_state_aarch64((void *)x, (void *)y);
+        switch_state_aarch64((void *)&x, (void *)&y);
         printf("Hello from x 2!\n");
-        switch_state_aarch64((void *)x, (void *)z);
+        switch_state_aarch64((void *)&x, (void *)&z);
         sleep(1);
     }
 
